@@ -5,3 +5,8 @@ node_modules/
 .next/
 __pycache__/
 .DS_Store
+
+# Python
+.venv/
+backend/.venv/
+*.pyc
