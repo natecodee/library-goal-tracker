@@ -5,6 +5,10 @@ from app.core.config import settings
 from app.routers.health import router as health_router
 from app.routers.documents import router as documents_router
 from app.routers.ai_routes import router as ai_router
+from app.routers.catalog import router as catalog_router
+from app.routers.alignment import router as alignment_router
+from app.routers.extracted_goals import router as extracted_goals_router
+
 
 
 app = FastAPI(title="Library Strategic Goals Tracker API")
@@ -22,4 +26,8 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(catalog_router, prefix="/api")
+app.include_router(alignment_router, prefix="/api")
+app.include_router(extracted_goals_router, prefix="/api")
+
 

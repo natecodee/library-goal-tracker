@@ -17,6 +17,48 @@ def _fallback_split_goals(text: str) -> list[str]:
     goals = [g.strip(" -•\t") for g in raw if g.strip()]
     return goals[:25]
 
+def _score_match(goal_text: str, item: dict[str, Any]) -> float:
+    """
+    Very simple keyword overlap scoring:
+    - compares goal_text words to (code + title + description)
+    - returns 0.0 to 1.0-ish
+    """
+    import re
+
+    def tokens(s: str) -> set[str]:
+        s = (s or "").lower()
+        s = re.sub(r"[^a-z0-9\s]", " ", s)
+        parts = [p for p in s.split() if len(p) > 2]
+        return set(parts)
+
+    g = tokens(goal_text)
+    hay = tokens(f"{item.get('code','')} {item.get('title','')} {item.get('description','')}")
+    if not g or not hay:
+        return 0.0
+
+    overlap = len(g & hay)
+    return overlap / max(1, len(g))
+
+
+def _fallback_align(goal_text: str, catalog: list[dict[str, Any]]) -> tuple[str | None, float | None]:
+    if not catalog:
+        return None, None
+
+    best = None
+    best_score = -1.0
+    for item in catalog:
+        score = _score_match(goal_text, item)
+        if score > best_score:
+            best_score = score
+            best = item
+
+    if not best:
+        return None, None
+
+    # treat this as "low confidence" because it's a basic heuristic
+    confidence = round(min(0.6, best_score), 2)
+    return best.get("code"), confidence
+
 
 
 def extract_goals(text: str) -> list[str]:
@@ -63,7 +105,8 @@ def suggest_alignment(goal_text: str, catalog: list[dict[str, Any]]) -> tuple[st
     returns (suggested_code, confidence)
     """
     if not settings.OPENAI_API_KEY or OpenAI is None:
-        return None, None
+        return _fallback_align(goal_text, catalog)
+
 
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -99,4 +142,10 @@ Strategic goal catalog:
         conf = data.get("confidence")
         return (code, float(conf) if conf is not None else None)
     except Exception:
+        # TEMP fallback (no OpenAI key): naive keyword matching
+        text = goal_text.lower()
+        for c in catalog:
+            blob = f"{c.get('code','')} {c.get('title','')} {c.get('description','')}".lower()
+            if any(w in blob for w in text.split() if len(w) > 4):
+                return c.get("code"), 0.30
         return None, None
